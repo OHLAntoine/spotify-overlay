@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AphinXSa — Spotify Overlay</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════════════════
+     WIDGET CONTAINER
+  ═══════════════════════════════════════════ */
+  #spotify-widget {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px 14px 14px;
+    background: rgba(8, 8, 12, 0.82);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    width: 360px;
+    min-height: 88px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 8px 32px rgba(0,0,0,0.6),
+      0 0 60px var(--glow-color, rgba(29, 185, 84, 0.15));
+    transition: box-shadow 1.2s ease, opacity 0.4s ease;
+    opacity: 0;
+  }
+
+  #spotify-widget.visible {
+    opacity: 1;
+  }
+
+  /* Glow left accent bar */
+  #spotify-widget::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 12px; bottom: 12px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent-color, #1db954);
+    box-shadow: 0 0 12px var(--accent-color, #1db954);
+    transition: background 1s ease, box-shadow 1s ease;
+  }
+
+  /* ═══════════════════════════════════════════
+     ALBUM ART
+  ═══════════════════════════════════════════ */
+  #album-art-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  #album-art {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+    display: block;
+    background: #1a1a2e;
+    transition: opacity 0.5s ease;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+
+  /* Vinyl spin ring */
+  #album-art-wrap::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 11px;
+    border: 1.5px solid var(--accent-color, #1db954);
+    opacity: 0;
+    transition: opacity 1s ease, border-color 1s ease;
+  }
+
+  #spotify-widget.playing #album-art-wrap::after {
+    opacity: 0.5;
+    animation: ring-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ring-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.03); }
+  }
+
+  /* ═══════════════════════════════════════════
+     TRACK INFO
+  ═══════════════════════════════════════════ */
+  #track-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* Label row */
+  #label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 1px;
+  }
+
+  #spotify-icon {
+    width: 12px;
+    height: 12px;
+    opacity: 0.6;
+    flex-shrink: 0;
+  }
+
+  #status-label {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-color, #1db954);
+    opacity: 0.85;
+    transition: color 1s ease;
+  }
+
+  /* Title */
+  #track-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #f0f0f5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  /* Artist */
+  #track-artist {
+    font-size: 11px;
+    font-weight: 400;
+    color: rgba(200, 200, 215, 0.65);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    letter-spacing: 0.01em;
+  }
+
+  /* Progress row */
+  #progress-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 5px;
+  }
+
+  #progress-bar-bg {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  #progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-color, #1db954);
+    border-radius: 2px;
+    transition: width 1s linear, background 1s ease;
+    position: relative;
+  }
+
+  /* Glowing dot at progress head */
+  #progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    right: -2px; top: -2px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px var(--accent-color, #1db954);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  #spotify-widget.playing #progress-bar-fill::after {
+    opacity: 1;
+  }
+
+  #time-current, #time-total {
+    font-size: 9px;
+    font-weight: 500;
+    color: rgba(180,180,195,0.5);
+    letter-spacing: 0.05em;
+    min-width: 28px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  #time-total { text-align: right; }
+
+  /* ═══════════════════════════════════════════
+     PAUSED / NOT PLAYING STATE
+  ═══════════════════════════════════════════ */
+  #idle-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 6px;
+    padding: 8px 0;
+    opacity: 0.35;
+  }
+
+  #idle-state svg { width: 20px; height: 20px; }
+  #idle-state span {
+    font-size: 11px;
+    font-weight: 500;
+    color: #888;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ═══════════════════════════════════════════
+     AUTH SCREEN
+  ═══════════════════════════════════════════ */
+  #auth-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(8,8,12,0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+  }
+
+  #auth-screen svg { width: 36px; height: 36px; opacity: 0.8; }
+
+  #auth-screen h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #f0f0f5;
+    letter-spacing: -0.01em;
+  }
+
+  #auth-screen p {
+    font-size: 12px;
+    color: rgba(180,180,195,0.6);
+    text-align: center;
+    max-width: 280px;
+    line-height: 1.6;
+  }
+
+  #auth-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: #1db954;
+    color: #000;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: transform 0.15s, opacity 0.15s;
+  }
+
+  #auth-btn:hover { opacity: 0.88; transform: scale(1.02); }
+  #auth-btn:active { transform: scale(0.97); }
+
+  #config-hint {
+    font-size: 10px;
+    color: rgba(150,150,165,0.4);
+    text-align: center;
+    max-width: 300px;
+    line-height: 1.7;
+    margin-top: 4px;
+  }
+
+  code {
+    background: rgba(255,255,255,0.07);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    color: #1db954;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     AUTH SCREEN (affiché au démarrage)
+═══════════════════════════════════════════ -->
+<div id="auth-screen">
+  <!-- Spotify logo -->
+  <svg viewBox="0 0 24 24" fill="#1db954" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+  </svg>
+  <h2>AphinXSa — Spotify Overlay</h2>
+  <p>Connecte ton compte Spotify pour afficher la musique en cours sur ton stream.</p>
+  <button id="auth-btn" onclick="startAuth()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+    Se connecter avec Spotify
+  </button>
+  <p id="config-hint">
+    Remplace les valeurs dans le script :<br>
+    <code>CLIENT_ID</code> et <code>REDIRECT_URI</code><br>
+    L'URI de redirection doit être ajoutée dans ton <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:#1db954">Dashboard Spotify</a>
+  </p>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     WIDGET PRINCIPAL
+═══════════════════════════════════════════ -->
+<div id="spotify-widget">
+  <div id="album-art-wrap">
+    <img id="album-art" src="" alt="Album art" crossorigin="anonymous" />
+  </div>
+
+  <div id="track-info">
+    <div id="label-row">
+      <svg id="spotify-icon" viewBox="0 0 24 24" fill="#1db954" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+      </svg>
+      <span id="status-label">En écoute</span>
+    </div>
+
+    <div id="track-name">—</div>
+    <div id="track-artist">—</div>
+
+    <div id="progress-row">
+      <span id="time-current">0:00</span>
+      <div id="progress-bar-bg">
+        <div id="progress-bar-fill"></div>
+      </div>
+      <span id="time-total">0:00</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   ⚙️  CONFIGURATION — À MODIFIER
+═══════════════════════════════════════════════════════════ */
+const CONFIG = {
+  CLIENT_ID:    '0f40eb00e0c14f56a6ec6c5b618a8fe5',          // ← Remplace ici
+  REDIRECT_URI: 'http://127.0.0.1:8000/callback',   // ← Doit matcher ton Dashboard Spotify
+  SCOPES:       'user-read-currently-playing user-read-playback-state',
+  POLL_INTERVAL: 3000,   // ms entre chaque appel API (min conseillé : 3000)
+};
+
+/* ═══════════════════════════════════════════════════════════
+   AUTH — PKCE (Proof Key for Code Exchange)
+   Pas besoin de backend ! Tout tourne côté client.
+═══════════════════════════════════════════════════════════ */
+
+// Génère un code_verifier aléatoire
+function generateCodeVerifier(length = 128) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const arr = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(arr).map(b => chars[b % chars.length]).join('');
+}
+
+// Génère le code_challenge SHA-256 depuis le verifier
+async function generateCodeChallenge(verifier) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+// Lance le flow OAuth PKCE
+async function startAuth() {
+  const verifier = generateCodeVerifier();
+  const challenge = await generateCodeChallenge(verifier);
+  localStorage.setItem('pkce_verifier', verifier);
+
+  const params = new URLSearchParams({
+    client_id:             CONFIG.CLIENT_ID,
+    response_type:         'code',
+    redirect_uri:          CONFIG.REDIRECT_URI,
+    scope:                 CONFIG.SCOPES,
+    code_challenge_method: 'S256',
+    code_challenge:        challenge,
+  });
+
+  window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+}
+
+// Échange le code contre un access_token
+async function exchangeCodeForToken(code) {
+  const verifier = localStorage.getItem('pkce_verifier');
+
+  const body = new URLSearchParams({
+    grant_type:    'authorization_code',
+    code,
+    redirect_uri:  CONFIG.REDIRECT_URI,
+    client_id:     CONFIG.CLIENT_ID,
+    code_verifier: verifier,
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  const data = await res.json();
+  if (data.access_token) {
+    saveTokens(data);
+    return true;
+  }
+  return false;
+}
+
+// Rafraîchit le token expiré
+async function refreshAccessToken() {
+  const refreshToken = localStorage.getItem('spotify_refresh_token');
+  if (!refreshToken) return false;
+
+  const body = new URLSearchParams({
+    grant_type:    'refresh_token',
+    refresh_token: refreshToken,
+    client_id:     CONFIG.CLIENT_ID,
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  const data = await res.json();
+  if (data.access_token) {
+    saveTokens(data);
+    return true;
+  }
+  return false;
+}
+
+function saveTokens(data) {
+  localStorage.setItem('spotify_access_token',  data.access_token);
+  localStorage.setItem('spotify_expires_at',    Date.now() + data.expires_in * 1000);
+  if (data.refresh_token) {
+    localStorage.setItem('spotify_refresh_token', data.refresh_token);
+  }
+}
+
+async function getValidToken() {
+  const token     = localStorage.getItem('spotify_access_token');
+  const expiresAt = parseInt(localStorage.getItem('spotify_expires_at') || '0');
+
+  if (token && Date.now() < expiresAt - 60000) return token; // marge 60s
+  const ok = await refreshAccessToken();
+  return ok ? localStorage.getItem('spotify_access_token') : null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   APPEL API — Currently Playing
+═══════════════════════════════════════════════════════════ */
+async function fetchCurrentlyPlaying() {
+  const token = await getValidToken();
+  if (!token) return null;
+
+  const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 204) return { is_playing: false, item: null }; // Rien en lecture
+  if (res.status === 401) { await refreshAccessToken(); return null; }
+  if (!res.ok) return null;
+
+  return res.json();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   COULEUR DOMINANTE depuis l'artwork (Canvas)
+═══════════════════════════════════════════════════════════ */
+function extractDominantColor(imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 10; // on réduit pour perf
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, 10, 10);
+    const data = ctx.getImageData(0, 0, 10, 10).data;
+
+    let r = 0, g = 0, b = 0, count = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      // Ignore les pixels trop sombres ou trop clairs
+      const brightness = (data[i] + data[i+1] + data[i+2]) / 3;
+      if (brightness > 30 && brightness < 220) {
+        r += data[i]; g += data[i+1]; b += data[i+2]; count++;
+      }
+    }
+    if (count === 0) return null;
+    r = Math.round(r / count);
+    g = Math.round(g / count);
+    b = Math.round(b / count);
+
+    // Boost saturation légèrement pour le glow
+    return `rgb(${r}, ${g}, ${b})`;
+  } catch(e) {
+    return null;
+  }
+}
+
+function applyAccentColor(color) {
+  if (!color) color = '#1db954';
+  document.documentElement.style.setProperty('--accent-color', color);
+  document.documentElement.style.setProperty('--glow-color', color.replace(')', ', 0.18)').replace('rgb', 'rgba'));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORMAT TEMPS
+═══════════════════════════════════════════════════════════ */
+function formatMs(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MISE À JOUR DU WIDGET
+═══════════════════════════════════════════════════════════ */
+let lastTrackId    = null;
+let progressOffset = 0;
+let progressTimer  = null;
+
+function startProgressTimer(progressMs, durationMs, isPlaying) {
+  clearInterval(progressTimer);
+  progressOffset = Date.now() - progressMs;
+
+  if (!isPlaying) {
+    updateProgressUI(progressMs, durationMs);
+    return;
+  }
+
+  progressTimer = setInterval(() => {
+    const current = Date.now() - progressOffset;
+    if (current >= durationMs) { clearInterval(progressTimer); return; }
+    updateProgressUI(current, durationMs);
+  }, 500);
+}
+
+function updateProgressUI(progressMs, durationMs) {
+  const pct = Math.min(100, (progressMs / durationMs) * 100);
+  document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+  document.getElementById('time-current').textContent = formatMs(progressMs);
+  document.getElementById('time-total').textContent   = formatMs(durationMs);
+}
+
+async function updateWidget(data) {
+  const widget = document.getElementById('spotify-widget');
+
+  if (!data || !data.item) {
+    widget.classList.remove('playing');
+    document.getElementById('status-label').textContent = 'En pause';
+    return;
+  }
+
+  const track     = data.item;
+  const isPlaying = data.is_playing;
+  const trackId   = track.id;
+
+  widget.classList.toggle('playing', isPlaying);
+  document.getElementById('status-label').textContent = isPlaying ? 'En écoute' : 'En pause';
+  document.getElementById('track-name').textContent   = track.name;
+  document.getElementById('track-artist').textContent = track.artists.map(a => a.name).join(', ');
+
+  startProgressTimer(data.progress_ms, track.duration_ms, isPlaying);
+
+  // Changement de track → update artwork + couleur
+  if (trackId !== lastTrackId) {
+    lastTrackId = trackId;
+    const art   = track.album?.images?.[0]?.url;
+    const imgEl = document.getElementById('album-art');
+
+    if (art) {
+      imgEl.onload = () => {
+        const color = extractDominantColor(imgEl);
+        applyAccentColor(color);
+      };
+      imgEl.src = art;
+    }
+  }
+
+  widget.classList.add('visible');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   POLLING — toutes les N secondes
+═══════════════════════════════════════════════════════════ */
+async function poll() {
+  const data = await fetchCurrentlyPlaying();
+  if (data) await updateWidget(data);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT — Gestion du callback OAuth + démarrage
+═══════════════════════════════════════════════════════════ */
+async function init() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const code      = urlParams.get('code');
+
+  if (code) {
+    // Retour depuis Spotify Auth
+    const ok = await exchangeCodeForToken(code);
+    // Nettoie l'URL
+    window.history.replaceState({}, '', window.location.pathname);
+    if (!ok) { alert('Erreur lors de l\'authentification Spotify.'); return; }
+  }
+
+  const token = await getValidToken();
+
+  if (token) {
+    // Token valide → on cache l'écran auth et on commence à poller
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('spotify-widget').classList.add('visible');
+    await poll();
+    setInterval(poll, CONFIG.POLL_INTERVAL);
+  }
+  // Sinon l'écran auth reste visible
+}
+
+init();
+</script>
+</body>
+</html>
