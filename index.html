@@ -607,7 +607,12 @@ async function init() {
 }
 
 init();
-startAuth();
+
+window.onload = () => {
+    setTimeout(() => {
+        document.getElementById("auth-btn").click();
+    }, 1000); // attend 1 seconde
+};
 </script>
 </body>
 </html>
