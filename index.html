@@ -599,6 +599,7 @@ async function init() {
   if (token) {
     // Token valide → on cache l'écran auth et on commence à poller
     document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('auth-btn').removeAttribute('onclick');
     document.getElementById('spotify-widget').classList.add('visible');
     await poll();
     setInterval(poll, CONFIG.POLL_INTERVAL);
@@ -607,7 +608,6 @@ async function init() {
 }
 
 init();
-
 window.onload = () => {
     setTimeout(() => {
         document.getElementById("auth-btn").click();
